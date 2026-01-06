@@ -1,0 +1,568 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Daily Check-In</title>
+  <style>
+    :root {
+      --green: #22c55e;
+      --yellow: #eab308;
+      --red: #ef4444;
+      --fg: #111827;
+      --muted: #6b7280;
+      --card: #ffffff;
+      --bg: #f3f4f6;
+      --ring: rgba(17, 24, 39, 0.12);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
+      color: var(--fg);
+      background: var(--bg);
+    }
+    header {
+      padding: 16px;
+      background: white;
+      border-bottom: 1px solid rgba(0,0,0,0.06);
+      position: sticky;
+      top: 0;
+      z-index: 5;
+    }
+    header .wrap {
+      max-width: 920px;
+      margin: 0 auto;
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .brand { font-weight: 700; }
+    nav a {
+      text-decoration: none;
+      color: var(--fg);
+      padding: 8px 10px;
+      border-radius: 10px;
+    }
+    nav a.active {
+      background: rgba(17, 24, 39, 0.06);
+    }
+    main {
+      max-width: 920px;
+      margin: 18px auto;
+      padding: 0 16px 28px;
+    }
+    .card {
+      background: var(--card);
+      border-radius: 16px;
+      padding: 16px;
+      box-shadow: 0 6px 18px rgba(0,0,0,0.06);
+      border: 1px solid rgba(0,0,0,0.06);
+    }
+    h1 { font-size: 22px; margin: 0 0 6px; }
+    p { margin: 0; color: var(--muted); }
+    .row { display: grid; grid-template-columns: 1fr; gap: 14px; margin-top: 14px; }
+    @media (min-width: 760px) { .row { grid-template-columns: 1fr 1fr; } }
+
+    .options { display: grid; gap: 10px; margin-top: 12px; }
+    .opt {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px;
+      border-radius: 14px;
+      border: 1px solid rgba(0,0,0,0.08);
+      cursor: pointer;
+      user-select: none;
+      transition: transform 0.02s ease;
+    }
+    .opt:active { transform: scale(0.997); }
+    .dot {
+      width: 14px;
+      height: 14px;
+      border-radius: 999px;
+      flex: 0 0 auto;
+      box-shadow: 0 0 0 6px rgba(0,0,0,0.03);
+    }
+    .opt .meta { display: flex; flex-direction: column; gap: 2px; }
+    .opt .label { font-weight: 700; }
+    .opt .desc { font-size: 13px; color: var(--muted); }
+
+    .opt.selected {
+      outline: 3px solid var(--ring);
+      border-color: rgba(0,0,0,0.14);
+    }
+
+    .btnbar { display: flex; gap: 10px; margin-top: 12px; flex-wrap: wrap; }
+    button {
+      border: 0;
+      border-radius: 12px;
+      padding: 10px 12px;
+      cursor: pointer;
+      background: rgba(17, 24, 39, 0.08);
+      color: var(--fg);
+      font-weight: 600;
+    }
+    button.primary {
+      background: #111827;
+      color: white;
+    }
+    button:disabled {
+      opacity: 0.55;
+      cursor: not-allowed;
+    }
+    .notice {
+      margin-top: 10px;
+      font-size: 13px;
+      color: var(--muted);
+    }
+
+    /* Calendar */
+    .cal-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-bottom: 10px;
+    }
+    .month {
+      font-weight: 800;
+      font-size: 16px;
+    }
+    .cal-grid {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      gap: 8px;
+    }
+    .dow {
+      font-size: 12px;
+      color: var(--muted);
+      text-align: center;
+      padding: 6px 0;
+    }
+    .day {
+      height: 44px;
+      border-radius: 12px;
+      border: 1px solid rgba(0,0,0,0.08);
+      background: white;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      overflow: hidden;
+    }
+    .day.muted {
+      background: rgba(255,255,255,0.6);
+      color: rgba(17,24,39,0.35);
+    }
+    .day .num { font-weight: 700; font-size: 14px; }
+
+    .day[data-status="better"] { background: color-mix(in srgb, var(--green) 22%, white); border-color: color-mix(in srgb, var(--green) 38%, white); }
+    .day[data-status="consistent"] { background: color-mix(in srgb, var(--yellow) 22%, white); border-color: color-mix(in srgb, var(--yellow) 38%, white); }
+    .day[data-status="not_my_best"] { background: color-mix(in srgb, var(--red) 18%, white); border-color: color-mix(in srgb, var(--red) 34%, white); }
+
+    .legend { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 12px; }
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 10px;
+      border-radius: 999px;
+      border: 1px solid rgba(0,0,0,0.08);
+      background: white;
+      font-size: 13px;
+      color: var(--fg);
+      font-weight: 600;
+    }
+    .pill .dot { width: 10px; height: 10px; box-shadow: none; }
+
+    .tiny { font-size: 12px; color: var(--muted); margin-top: 10px; }
+    code.inline { background: rgba(17,24,39,0.06); padding: 2px 6px; border-radius: 8px; }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="wrap">
+      <div class="brand">Daily Check-In</div>
+      <nav>
+        <a href="#/checkin" id="nav-checkin">Check-in</a>
+        <a href="#/calendar" id="nav-calendar">Calendar</a>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <!-- Check-in page -->
+    <section id="page-checkin" class="card" hidden>
+      <h1>How did you do today?</h1>
+      <p>Pick one. It saves automatically for today.</p>
+
+      <div class="options" id="options"></div>
+
+      <div class="btnbar">
+        <button class="primary" id="saveBtn" disabled>Save today</button>
+        <button id="clearTodayBtn">Clear today</button>
+        <button id="goCalendarBtn">View calendar</button>
+      </div>
+
+      <div class="notice" id="notice"></div>
+      <div class="tiny">
+        Data is saved only in this browser (localStorage). If you want sync across devices later, you’d add a backend.
+      </div>
+    </section>
+
+    <!-- Calendar page -->
+    <section id="page-calendar" class="card" hidden>
+      <div class="cal-top">
+        <div>
+          <div class="month" id="monthLabel"></div>
+          <div class="tiny">Click <span class="inline code">Check-in</span> to update today.</div>
+        </div>
+        <div class="btnbar" style="margin:0;">
+          <button id="prevMonthBtn">◀</button>
+          <button id="todayBtn">Today</button>
+          <button id="nextMonthBtn">▶</button>
+        </div>
+      </div>
+
+      <div class="cal-grid" id="dowRow"></div>
+      <div class="cal-grid" id="calendarGrid" style="margin-top:6px;"></div>
+
+      <div class="legend">
+        <span class="pill"><span class="dot" style="background: var(--green)"></span> Better</span>
+        <span class="pill"><span class="dot" style="background: var(--yellow)"></span> Consistent</span>
+        <span class="pill"><span class="dot" style="background: var(--red)"></span> Not my best</span>
+      </div>
+
+      <div class="btnbar">
+        <button id="goCheckinBtn">Go to check-in</button>
+        <button id="exportBtn">Export JSON</button>
+        <button id="importBtn">Import JSON</button>
+        <input id="importFile" type="file" accept="application/json" hidden />
+      </div>
+
+      <div class="notice" id="calNotice"></div>
+    </section>
+  </main>
+
+  <script>
+    // ======= Config =======
+    const STATUS = {
+      better: { label: "Better", color: "green", desc: "Felt like progress today." },
+      consistent: { label: "Consistent", color: "yellow", desc: "Steady and on track." },
+      not_my_best: { label: "Not my best", color: "red", desc: "A tougher day, but that’s okay." }
+    };
+
+    const STORAGE_KEY = "daily_checkins_v1";
+
+    // ======= Helpers =======
+    const pad2 = (n) => String(n).padStart(2, "0");
+
+    function toISODate(d) {
+      // local date -> YYYY-MM-DD
+      return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+    }
+
+    function loadAll() {
+      try {
+        return JSON.parse(localStorage.getItem(STORAGE_KEY)) || {};
+      } catch {
+        return {};
+      }
+    }
+
+    function saveAll(obj) {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(obj));
+    }
+
+    function setTodayStatus(statusKey) {
+      const all = loadAll();
+      const today = toISODate(new Date());
+      all[today] = statusKey;
+      saveAll(all);
+    }
+
+    function clearTodayStatus() {
+      const all = loadAll();
+      const today = toISODate(new Date());
+      delete all[today];
+      saveAll(all);
+    }
+
+    function getTodayStatus() {
+      const all = loadAll();
+      return all[toISODate(new Date())] || null;
+    }
+
+    function formatMonthYear(d) {
+      return d.toLocaleString(undefined, { month: "long", year: "numeric" });
+    }
+
+    // ======= Routing =======
+    const pageCheckin = document.getElementById("page-checkin");
+    const pageCalendar = document.getElementById("page-calendar");
+    const navCheckin = document.getElementById("nav-checkin");
+    const navCalendar = document.getElementById("nav-calendar");
+
+    function showPage(name) {
+      const isCheckin = name === "checkin";
+      pageCheckin.hidden = !isCheckin;
+      pageCalendar.hidden = isCheckin;
+
+      navCheckin.classList.toggle("active", isCheckin);
+      navCalendar.classList.toggle("active", !isCheckin);
+
+      if (isCheckin) renderCheckin();
+      else renderCalendar();
+    }
+
+    function route() {
+      const hash = location.hash || "#/checkin";
+      const page = hash.replace("#/", "");
+      showPage(page === "calendar" ? "calendar" : "checkin");
+    }
+
+    window.addEventListener("hashchange", route);
+
+    // ======= Check-in UI =======
+    const optionsEl = document.getElementById("options");
+    const saveBtn = document.getElementById("saveBtn");
+    const clearTodayBtn = document.getElementById("clearTodayBtn");
+    const goCalendarBtn = document.getElementById("goCalendarBtn");
+    const notice = document.getElementById("notice");
+
+    let selected = null;
+
+    function renderCheckin() {
+      optionsEl.innerHTML = "";
+      notice.textContent = "";
+
+      const today = new Date();
+      const existing = getTodayStatus();
+      selected = existing;
+
+      const titleLine = document.createElement("div");
+      titleLine.className = "tiny";
+      titleLine.style.marginTop = "8px";
+      titleLine.textContent = `Today is ${today.toLocaleDateString(undefined, { weekday: "long", month: "short", day: "numeric", year: "numeric" })}`;
+      pageCheckin.insertBefore(titleLine, optionsEl);
+
+      // Remove any duplicate titleLine from previous render
+      // (quick cleanup: if there are multiple, keep only the latest)
+      const tinyLines = pageCheckin.querySelectorAll(":scope > .tiny");
+      if (tinyLines.length > 1) {
+        for (let i = 0; i < tinyLines.length - 1; i++) tinyLines[i].remove();
+      }
+
+      Object.entries(STATUS).forEach(([key, cfg]) => {
+        const div = document.createElement("div");
+        div.className = "opt" + (selected === key ? " selected" : "");
+        div.setAttribute("role", "button");
+        div.tabIndex = 0;
+
+        const dot = document.createElement("span");
+        dot.className = "dot";
+        dot.style.background =
+          key === "better" ? "var(--green)" :
+          key === "consistent" ? "var(--yellow)" :
+          "var(--red)";
+
+        const meta = document.createElement("div");
+        meta.className = "meta";
+
+        const label = document.createElement("div");
+        label.className = "label";
+        label.textContent = cfg.label;
+
+        const desc = document.createElement("div");
+        desc.className = "desc";
+        desc.textContent = cfg.desc;
+
+        meta.appendChild(label);
+        meta.appendChild(desc);
+
+        div.appendChild(dot);
+        div.appendChild(meta);
+
+        const selectThis = () => {
+          selected = key;
+          [...optionsEl.children].forEach(c => c.classList.remove("selected"));
+          div.classList.add("selected");
+          saveBtn.disabled = false;
+        };
+
+        div.addEventListener("click", selectThis);
+        div.addEventListener("keydown", (e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            selectThis();
+          }
+        });
+
+        optionsEl.appendChild(div);
+      });
+
+      if (existing) {
+        notice.textContent = `Saved for today: ${STATUS[existing].label}. You can change it and save again.`;
+        saveBtn.disabled = true; // Only enable when they change selection
+      } else {
+        notice.textContent = "Nothing saved for today yet.";
+        saveBtn.disabled = selected ? true : true;
+      }
+    }
+
+    saveBtn.addEventListener("click", () => {
+      if (!selected) return;
+      setTodayStatus(selected);
+      notice.textContent = `Saved for today: ${STATUS[selected].label}.`;
+      saveBtn.disabled = true;
+    });
+
+    clearTodayBtn.addEventListener("click", () => {
+      clearTodayStatus();
+      selected = null;
+      notice.textContent = "Cleared today’s entry.";
+      renderCheckin();
+    });
+
+    goCalendarBtn.addEventListener("click", () => {
+      location.hash = "#/calendar";
+    });
+
+    // ======= Calendar UI =======
+    const monthLabel = document.getElementById("monthLabel");
+    const calendarGrid = document.getElementById("calendarGrid");
+    const dowRow = document.getElementById("dowRow");
+    const prevMonthBtn = document.getElementById("prevMonthBtn");
+    const nextMonthBtn = document.getElementById("nextMonthBtn");
+    const todayBtn = document.getElementById("todayBtn");
+    const goCheckinBtn = document.getElementById("goCheckinBtn");
+    const calNotice = document.getElementById("calNotice");
+
+    const exportBtn = document.getElementById("exportBtn");
+    const importBtn = document.getElementById("importBtn");
+    const importFile = document.getElementById("importFile");
+
+    let viewDate = new Date();
+
+    function renderDow() {
+      const dows = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+      dowRow.innerHTML = "";
+      dows.forEach(d => {
+        const el = document.createElement("div");
+        el.className = "dow";
+        el.textContent = d;
+        dowRow.appendChild(el);
+      });
+    }
+
+    function renderCalendar() {
+      renderDow();
+      calNotice.textContent = "";
+
+      const year = viewDate.getFullYear();
+      const month = viewDate.getMonth();
+
+      monthLabel.textContent = formatMonthYear(viewDate);
+      calendarGrid.innerHTML = "";
+
+      const all = loadAll();
+
+      const first = new Date(year, month, 1);
+      const last = new Date(year, month + 1, 0);
+      const startDow = first.getDay();
+      const daysInMonth = last.getDate();
+
+      // Leading blanks (previous month)
+      const prevLast = new Date(year, month, 0).getDate();
+      for (let i = 0; i < startDow; i++) {
+        const dayNum = prevLast - (startDow - 1 - i);
+        const cell = document.createElement("div");
+        cell.className = "day muted";
+        cell.innerHTML = `<span class="num">${dayNum}</span>`;
+        calendarGrid.appendChild(cell);
+      }
+
+      // Current month
+      for (let d = 1; d <= daysInMonth; d++) {
+        const dateObj = new Date(year, month, d);
+        const key = toISODate(dateObj);
+        const statusKey = all[key];
+
+        const cell = document.createElement("div");
+        cell.className = "day";
+        if (statusKey) cell.dataset.status = statusKey;
+
+        cell.innerHTML = `<span class="num">${d}</span>`;
+        cell.title = statusKey ? `${key}: ${STATUS[statusKey].label}` : `${key}: (no entry)`;
+
+        calendarGrid.appendChild(cell);
+      }
+
+      // Trailing blanks (next month) to complete grid rows
+      const totalCells = calendarGrid.children.length;
+      const remainder = totalCells % 7;
+      const trailing = remainder === 0 ? 0 : (7 - remainder);
+      for (let i = 1; i <= trailing; i++) {
+        const cell = document.createElement("div");
+        cell.className = "day muted";
+        cell.innerHTML = `<span class="num">${i}</span>`;
+        calendarGrid.appendChild(cell);
+      }
+    }
+
+    prevMonthBtn.addEventListener("click", () => {
+      viewDate = new Date(viewDate.getFullYear(), viewDate.getMonth() - 1, 1);
+      renderCalendar();
+    });
+    nextMonthBtn.addEventListener("click", () => {
+      viewDate = new Date(viewDate.getFullYear(), viewDate.getMonth() + 1, 1);
+      renderCalendar();
+    });
+    todayBtn.addEventListener("click", () => {
+      viewDate = new Date();
+      renderCalendar();
+    });
+    goCheckinBtn.addEventListener("click", () => {
+      location.hash = "#/checkin";
+    });
+
+    // Export / Import (optional but handy)
+    exportBtn.addEventListener("click", () => {
+      const data = JSON.stringify(loadAll(), null, 2);
+      const blob = new Blob([data], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "daily-checkins.json";
+      a.click();
+      URL.revokeObjectURL(url);
+      calNotice.textContent = "Exported your check-ins as JSON.";
+    });
+
+    importBtn.addEventListener("click", () => importFile.click());
+
+    importFile.addEventListener("change", async () => {
+      const file = importFile.files?.[0];
+      if (!file) return;
+      try {
+        const text = await file.text();
+        const obj = JSON.parse(text);
+        if (!obj || typeof obj !== "object") throw new Error("Invalid JSON");
+        saveAll(obj);
+        calNotice.textContent = "Imported! Calendar updated.";
+        renderCalendar();
+      } catch (e) {
+        calNotice.textContent = "Import failed. Make sure it’s a valid JSON export from this app.";
+      } finally {
+        importFile.value = "";
+      }
+    });
+
+    // ======= Init =======
+    route();
+  </script>
+</body>
+</html>
